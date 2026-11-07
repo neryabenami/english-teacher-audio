@@ -1,0 +1,11 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+kokoro>=0.9.4
+soundfile
+lameenc
+# spaCy helper libraries: the releases of 24-25 Oct 2026 break loading the English model (OverflowError in the tokenizer)
+preshed<3.0.14
+cymem<2.0.16
+murmurhash<1.0.16
+blis<1.3.4
+srsly<2.5.5
