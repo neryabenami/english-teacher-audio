@@ -1,0 +1,62 @@
+# Makes the app's audio (Kokoro voice "Heart") after each content run of the app, and publishes it - the day's audio is ready before 08:00 Israel time.
+# History is squashed on every run, so old article audio really leaves the repository.
+name: Make audio
+
+on:
+  schedule:
+    - cron: '52 1 * * *'    # after each morning content run (01:07, 02:22, 03:37 UTC)
+    - cron: '7 3 * * *'
+    - cron: '20 4 * * *'    # the last one - all done before 08:00 Israel time
+    - cron: '0 12,18 * * *' # examples written later in the day
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: Minutes of audio making in this run
+        default: '150'
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: audio
+  cancel-in-progress: false
+
+jobs:
+  audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: neryabenami/english-teacher
+          path: app
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install the voice engine
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q espeak-ng
+          pip install -q -r requirements.txt
+      - name: Git identity for publishing during the run
+        run: git config user.name "github-actions[bot]" && git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Make the missing audio
+        run: python tools/make_audio.py
+        env:
+          BUDGET_MIN: ${{ inputs.budget || '150' }}
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish (one squashed commit)
+        run: |
+          rm -rf app
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan fresh
+          git add -A
+          git commit -q -m "Audio $(date -u +%F' '%H:%M)"
+          git push -f origin fresh:main
+      - name: Publish on GitHub Pages
+        run: gh api -X POST repos/${{ github.repository }}/pages/builds
+        env:
+          GH_TOKEN: ${{ github.token }}
